@@ -18,7 +18,7 @@ The upload API stores a job and returns without running the AI analysis inline. 
 
 1. Apply every SQL migration in `supabase/migrations`, including `202610220003_durable_processing_queue.sql`.
 2. Set `SUPABASE_SERVICE_ROLE_KEY` and a strong random `CRON_SECRET` in the server deployment environment. Never expose either using a `NEXT_PUBLIC_*` variable.
-3. The included `vercel.json` configures a five-minute Vercel Cron. Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically when that environment variable is configured. Confirm that the deployment plan supports the selected cron frequency; otherwise configure an external scheduler to call `/api/worker` with that header.
+3. Configure a scheduler to call `https://YOUR_DEPLOYMENT/api/worker` every five minutes with `Authorization: Bearer YOUR_CRON_SECRET`. If using Vercel Cron, configure it in the deployment settings only if the current plan supports that frequency; some plans restrict cron frequency. Otherwise use another trusted scheduler.
 4. Ensure the deployment platform permits the worker function to run for up to 60 seconds. If scheduled invocations are delayed or disabled, jobs remain persisted and resume when the scheduler runs again.
 
 The scheduler claims one job per invocation. Overlapping invocations are safe because PostgreSQL claims work atomically with `FOR UPDATE SKIP LOCKED`. Temporary provider/persistence failures receive bounded retries; expired leases and exhausted jobs are reconciled rather than remaining stuck forever.
