@@ -2,41 +2,52 @@
 
 A document-intelligence MVP focused on structured analysis and inspectable evidence rather than a generic PDF chatbot.
 
-## Current implementation
+## Implemented in this branch
 
-- Next.js App Router, TypeScript strict mode, restrained document-workbench UI.
-- PDF upload validation (extension, browser MIME when provided, PDF signature, size, page count and extracted text bounds).
-- Server-side PDF text extraction and explicit rejection of empty/image-only documents.
-- Gemini analysis adapter with bounded request timeout, JSON schema validation, safe client-facing errors, and evidence excerpt verification against extracted page text.
+- Next.js App Router, TypeScript strict mode and a responsive document-workbench UI.
+- Supabase email/password sign-in and sign-up screen.
+- Authenticated PDF intake with extension, MIME type (when provided), signature, size, page-count, parse-failure and extracted-text bounds checks.
+- Private Supabase Storage upload and owner-scoped document, processing-run, result and event records.
+- Gemini analysis adapter with bounded request timeout, JSON schema validation, safe client-facing errors, and evidence excerpt checks against extracted text.
 - JSON export of the validated analysis.
-- Supabase schema migration for owner-scoped documents, processing runs, versioned results, redacted events, RLS and a private PDF bucket.
-- Vitest schema tests and typecheck/lint/build scripts.
+- Supabase SQL migrations for owner-scoped tables, RLS policies and a private PDF bucket.
+- Vitest schema tests and GitHub Actions checks for lint, typecheck, tests and production build.
 
 ## Important scope limits
 
-This is an early vertical slice, **not a production-ready complete application**. The current UI analysis endpoint does not yet persist uploads/results, authenticate users, use the database migration, implement durable background jobs/retries, support OCR, provide document history, or test live Supabase/n8n integrations. Do not upload confidential documents. Evidence page mapping depends on the PDF parser's text output and should be tested against a fixture corpus before relying on it.
+This is an early MVP slice, **not a production-ready complete application**. The current request performs analysis in a single server request; durable background jobs, bounded retry/reconciliation, immutable reprocessing history, document search/list/detail/history UI, n8n callbacks, OCR, full end-to-end/access-control tests and reliable cross-system cleanup remain incomplete. Page-level evidence mapping is only as reliable as the extracted text's page separators; validate against a fixture corpus before relying on it.
+
+Do not upload confidential, regulated, or high-impact documents. The application sends extracted document text to Google Gemini for analysis.
 
 ## Requirements
 
 - Node.js 20 or newer
 - npm
-- A Gemini API key for live analysis
-- Supabase project only when implementing the persistence/authentication phase
+- A Supabase project
+- A Gemini API key
 
 ## Local setup
 
 ```bash
-npm ci
+npm install
 cp .env.example .env.local
 ```
 
-Set `GEMINI_API_KEY` in `.env.local`. Set `GEMINI_MODEL` if using a different supported Gemini model. Start the app:
+Set these variables in `.env.local`:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `GEMINI_API_KEY`
+- Optional: `GEMINI_MODEL`, `MAX_PDF_BYTES`, `MAX_EXTRACTED_CHARS`
+
+Never commit `.env.local` or expose the Gemini key or Supabase service-role key in a `NEXT_PUBLIC_*` variable. The service-role key is not required by this implementation.
+
+Apply the SQL migrations in `supabase/migrations` to your Supabase project, then enable email/password authentication in Supabase Auth. Start the application:
 
 ```bash
 npm run dev
 ```
 
-Open http://localhost:3000. Never commit `.env.local` or expose the Gemini key in a `NEXT_PUBLIC_*` variable.
+Open http://localhost:3000. Sign in or create an account at `/login` before uploading.
 
 ## Checks
 
@@ -47,12 +58,8 @@ npm test
 npm run build
 ```
 
-These commands are provided for reproducibility; their status must be verified in CI or a local environment before release.
+GitHub Actions is configured to run these checks. Confirm the workflow result before treating the branch as verified. This repository currently has no committed lockfile; `npm install` will resolve and create one locally. Commit the resulting lockfile before relying on reproducible CI installs.
 
-## Supabase migration
+## Processing and privacy
 
-Apply `supabase/migrations/202610220001_initial_schema.sql` using Supabase CLI or the SQL editor. The schema is preparatory and is not yet wired to the current upload route. Review policies against your project's existing policies before applying to a non-empty project.
-
-## Privacy and limitations
-
-The selected PDF is transmitted to the application server and extracted text is sent to Google Gemini for analysis. The current endpoint does not persist the source file, but request handling and third-party processing still occur. Do not use confidential or regulated data. Image-only/scanned PDFs, OCR, durable job orchestration, n8n callbacks, retry/reconciliation and persistent history are not implemented in this slice. No compliance certification is claimed.
+PDFs are uploaded to a private Supabase Storage bucket. The extracted text is sent to Google Gemini. Owner-based RLS policies are included in the migrations. These controls are an initial implementation and have not yet received a full adversarial authorization audit. No OCR, durable queue, n8n integration, compliance certification, or guarantee of evidence accuracy is claimed.
