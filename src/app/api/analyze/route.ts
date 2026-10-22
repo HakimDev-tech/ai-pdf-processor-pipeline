@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import pdf from "pdf-parse";
 import { env } from "@/lib/env";
 import { analyzeDocument } from "@/lib/analysis/gemini";
+import { validateAnalysisEvidence } from "@/lib/analysis/evidence";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -101,24 +102,15 @@ export async function POST(request: Request) {
     const pageTexts = text.split("\f").map((page) => page.trim());
     const safePages = pageTexts.length ? pageTexts : [text];
     const analysis = await analyzeDocument(text, safePages);
-    const flattened = safePages.map((p) => p.toLowerCase());
-    for (const group of [analysis.keyPoints, analysis.datesAndObligations, analysis.risksAndAmbiguities]) {
-      for (const finding of group) {
-        finding.evidence = finding.evidence.filter((e) => {
-          const page = flattened[e.page - 1];
-          return Boolean(page && page.includes(e.excerpt.toLowerCase().trim()));
-        });
-        if (finding.evidence.length === 0 && finding.certainty === "supported") finding.certainty = "uncertain";
-      }
-    }
+    const validatedAnalysis = validateAnalysisEvidence(analysis, safePages);
     const { error: resultError } = await supabase.from("analysis_results").insert({
-      run_id: runId, document_id: documentId, owner_id: ownerId, schema_version: "1", prompt_version: "1", result: analysis
+      run_id: runId, document_id: documentId, owner_id: ownerId, schema_version: "1", prompt_version: "1", result: validatedAnalysis
     });
     if (resultError) throw new Error("RESULT_PERSISTENCE_FAILED");
     await supabase.from("processing_runs").update({ state: "completed", finished_at: new Date().toISOString() }).eq("id", runId).eq("owner_id", ownerId);
     await supabase.from("documents").update({ status: "completed", updated_at: new Date().toISOString() }).eq("id", documentId).eq("owner_id", ownerId);
     await supabase.from("processing_events").insert({ run_id: runId, owner_id: ownerId, event_type: "completed", safe_code: "ANALYSIS_COMPLETED", details: { pages: parsed.numpages, extractedCharacters: text.length } });
-    return NextResponse.json({ analysis, metadata: { documentId, runId, pages: parsed.numpages, extractedCharacters: text.length } });
+    return NextResponse.json({ analysis: validatedAnalysis, metadata: { documentId, runId, pages: parsed.numpages, extractedCharacters: text.length } });
   } catch (error) {
     const code = error instanceof Error ? error.message : "UNKNOWN";
     if (supabase && ownerId && runId) {
