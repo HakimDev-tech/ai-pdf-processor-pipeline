@@ -15,9 +15,9 @@ export async function analyzeDocument(text: string, pageTexts: string[]): Promis
     "BOUNDED DOCUMENT EXTRACT:\n" + text
   ].join("\n\n");
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(env.GEMINI_API_KEY)}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
@@ -29,7 +29,7 @@ export async function analyzeDocument(text: string, pageTexts: string[]): Promis
     throw new Error(response.status >= 500 ? "AI_PROVIDER_UNAVAILABLE" : "AI_PROVIDER_REJECTED_REQUEST");
   }
   const payload: unknown = await response.json();
-  const raw = (payload as { candidates?: { content?: { parts?: { text?: string }[] }[] } })
+  const raw = (payload as { candidates?: { content?: { parts?: { text?: string }[] } }[] })
     .candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("");
   if (!raw) throw new Error("AI_EMPTY_RESPONSE");
   let parsed: unknown;
