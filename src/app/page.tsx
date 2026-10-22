@@ -11,6 +11,8 @@ type Analysis = {
   recommendations: string[]; limitations: string[];
 };
 
+type AnalysisVersion = { id: string; run_number: number; state: string; attempt_count: number; max_attempts: number; failure_code: string | null; created_at: string; finished_at: string | null; analysis: Analysis | null; analysisCreatedAt: string | null };
+
 type SavedDocument = {
   id: string; display_name: string; status: string; page_count: number | null;
   byte_size: number; created_at: string; latestAnalysis: Analysis | null;
@@ -20,6 +22,8 @@ export default function Home() {
   const [documents, setDocuments] = useState<SavedDocument[]>([]);
   const [historyBusy, setHistoryBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [versionsByDocument, setVersionsByDocument] = useState<Record<string, AnalysisVersion[]>>({});
+  const [versionsBusyId, setVersionsBusyId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [requestKey, setRequestKey] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,6 +43,34 @@ export default function Home() {
   }, []);
 
   useEffect(() => { void refreshHistory(); }, [refreshHistory]);
+
+  async function loadVersions(id: string) {
+    setVersionsBusyId(id);
+    try {
+      const response = await fetch("/api/documents/" + id + "/versions", { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Versions could not be loaded.");
+      setVersionsByDocument((current) => ({ ...current, [id]: payload.versions as AnalysisVersion[] }));
+    } catch (e) {
+      setError(true); setMessage(e instanceof Error ? e.message : "Versions could not be loaded.");
+    } finally { setVersionsBusyId(null); }
+  }
+
+  async function reprocessDocument(id: string) {
+    if (!window.confirm("Create a new immutable analysis version? This sends the PDF to Gemini again and may consume API quota.")) return;
+    try {
+      const response = await fetch("/api/documents/" + id + "/reprocess", { method: "POST" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Reprocessing could not be queued.");
+      setMessage("Version " + payload.runNumber + " queued for processing.");
+      setError(false);
+      await refreshHistory();
+      await loadVersions(id);
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Reprocessing could not be queued.");
+      setError(true);
+    }
+  }
 
   async function deleteDocument(id: string) {
     if (!window.confirm("Delete this PDF, its saved analysis, and processing history? This cannot be undone.")) return;
@@ -119,6 +151,17 @@ export default function Home() {
               <b style={{overflowWrap:"anywhere"}}>{document.display_name}</b>
               <p className="muted">{document.status} · {document.page_count ?? "?"} pages · {(document.byte_size / 1024 / 1024).toFixed(2)} MB · {new Date(document.created_at).toLocaleString()}</p>
               {document.latestAnalysis ? <><p style={{margin:"8px 0"}}>{document.latestAnalysis.title || "Untitled analysis"}</p><button className="button" onClick={() => {setAnalysis(document.latestAnalysis);window.scrollTo({top:0,behavior:"smooth"});}}>View latest analysis</button></> : <p className="muted">No saved analysis result.</p>}
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+                <button className="button" onClick={() => void loadVersions(document.id)} disabled={versionsBusyId === document.id}>{versionsBusyId === document.id ? "Loading versions…" : "Version history"}</button>
+                <button className="button" onClick={() => void reprocessDocument(document.id)} disabled={document.status === "processing"}>Create new version</button>
+              </div>
+              {versionsByDocument[document.id] && <div style={{display:"grid",gap:8,marginTop:12}}>
+                {versionsByDocument[document.id].map((version) => <div key={version.id} className="notice">
+                  <b>Version {version.run_number}</b><span className="muted"> · {version.state} · {version.attempt_count}/{version.max_attempts} attempts</span>
+                  <p className="muted">{new Date(version.created_at).toLocaleString()}{version.failure_code ? " · " + version.failure_code : ""}</p>
+                  {version.analysis && <button className="button" onClick={() => {setAnalysis(version.analysis);window.scrollTo({top:0,behavior:"smooth"});}}>View this version</button>}
+                </div>)}
+              </div>}
             </div>
             <button className="button" onClick={() => void deleteDocument(document.id)} disabled={deletingId === document.id}>{deletingId === document.id ? "Deleting…" : "Delete"}</button>
           </article>)}
