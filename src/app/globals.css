@@ -22,13 +22,15 @@
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 96px; background: var(--paper); }
 body { margin: 0; min-height: 100%; background: var(--paper); color: var(--ink); font-family: "DM Sans", sans-serif; -webkit-font-smoothing: antialiased; }
+/* Ambient evidence field: a living page-wide layer, not another hero-only effect. */
+body::after { position: fixed; inset: -8%; z-index: 0; content: ""; pointer-events: none; opacity: .72; background: radial-gradient(ellipse at 12% 18%, rgba(166,221,208,.46), transparent 34%), radial-gradient(ellipse at 82% 24%, rgba(255,137,112,.18), transparent 28%), radial-gradient(ellipse at 72% 82%, rgba(166,221,208,.34), transparent 32%), radial-gradient(ellipse at 18% 76%, rgba(255,137,112,.10), transparent 27%), repeating-linear-gradient(0deg, transparent 0 79px, rgba(32,44,49,.027) 80px), repeating-linear-gradient(90deg, transparent 0 79px, rgba(32,44,49,.027) 80px); background-size: 125% 125%, 130% 130%, 120% 120%, 135% 135%, 80px 80px, 80px 80px; background-position: 0% 0%, 100% 0%, 100% 100%, 0% 100%, center, center; animation: ambient-drift 34s ease-in-out infinite alternate; }
 body::before { position: fixed; inset: 0; z-index: -1; content: ""; pointer-events: none; opacity: .2; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.13'/%3E%3C/svg%3E"); }
 button, input { font: inherit; }
 a { color: inherit; }
 button, a, input { -webkit-tap-highlight-color: transparent; }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid var(--coral); outline-offset: 4px; }
 ::selection { color: var(--ink-deep); background: var(--mint); }
-.shell { max-width: 1440px; margin: 0 auto; padding: 0 clamp(20px, 5.2vw, 76px); overflow: clip; }
+.shell { position: relative; z-index: 1; max-width: 1440px; margin: 0 auto; padding: 0 clamp(20px, 5.2vw, 76px); overflow: clip; }
 .topbar { height: 82px; position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 30px; border-bottom: 1px solid rgba(32,44,49,.12); background: rgba(242,240,233,.88); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
 .topbar::after { position: absolute; content: ""; height: 2px; width: 100%; left: 0; bottom: -1px; transform-origin: left; background: var(--coral); transform: scaleX(0); animation: reading-progress linear both; animation-timeline: scroll(root); }
 @keyframes reading-progress { to { transform: scaleX(1); } }
@@ -160,6 +162,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .foot > a:hover { color: var(--coral-dark); }
 .foot-note { grid-column: 1 / -1; padding-top: 14px; border-top: 1px solid rgba(32,44,49,.08); color: #9aa19a; font: 9px "DM Mono", monospace; letter-spacing: .1em; }
 
+@keyframes ambient-drift { 0% { transform: translate3d(-1.2%, -0.6%, 0) scale(1); filter: hue-rotate(0deg); } 50% { transform: translate3d(1%, .8%, 0) scale(1.035); } 100% { transform: translate3d(-.3%, 1.2%, 0) scale(1.015); filter: hue-rotate(-7deg); } }
 @keyframes enter-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(255,137,112,.12); } 50% { box-shadow: 0 0 0 7px rgba(255,137,112,0); } }
 @keyframes float-chip { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
@@ -223,6 +226,8 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   .foot > span:nth-child(2) { grid-row: auto; }
   .foot-note { grid-row: auto; }
 }
+@media (max-width: 720px) { body::after { inset: -3%; opacity: .55; background-size: 150% 150%, 150% 150%, 150% 150%, 150% 150%, 64px 64px, 64px 64px; } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  body::after { transform: none !important; }
 }
