@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     }
     runId = run.id;
 
-    const pageTexts = text.split("\f").map((page) => page.trim()).filter(Boolean);
+    const pageTexts = text.split("\f").map((page) => page.trim());
     const safePages = pageTexts.length ? pageTexts : [text];
     const analysis = await analyzeDocument(text, safePages);
     const flattened = safePages.map((p) => p.toLowerCase());
