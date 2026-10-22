@@ -1,388 +1,54 @@
-# AI PDF Processor Pipeline
+# Papertrail — AI PDF Processor Pipeline
 
-> **Production-oriented AI document processing pipeline built with Next.js, n8n, Gemini/Groq, and Supabase.**
+A document-intelligence MVP focused on structured analysis and inspectable evidence rather than a generic PDF chatbot.
 
-Automatically upload, process, summarize, and analyze PDF documents using Large Language Models (LLMs) through a modern AI automation architecture.
+## Current capabilities
 
----
+- Next.js App Router, TypeScript strict mode and a responsive document-workbench UI.
+- Supabase email/password authentication and owner-scoped document history.
+- Bounded PDF upload checks and private Supabase Storage.
+- Durable database-backed processing queue with atomic worker claims, expiring leases, bounded retries, backoff and exhausted-job reconciliation.
+- Gemini structured analysis with Zod validation and page-level evidence excerpt checks.
+- Persisted results, processing events, idempotent request replay, JSON export and owner-scoped document deletion.
+- GitHub Actions checks for lint, typecheck, tests and production build.
 
-# 🚀 Overview
+## Worker scheduling is required
 
-AI PDF Processor Pipeline is a full-stack AI application designed to automate the analysis of text-based PDF documents.
+The upload API stores a job and returns without running the AI analysis inline. A scheduler must invoke `GET /api/worker` to drain the queue. The worker checks the `CRON_SECRET` bearer token.
 
-The project demonstrates how to build a production-style AI workflow using modern technologies without relying on vector databases or Retrieval-Augmented Generation (RAG).
+1. Apply every SQL migration in `supabase/migrations`, including `202610220003_durable_processing_queue.sql`.
+2. Set `SUPABASE_SERVICE_ROLE_KEY` and a strong random `CRON_SECRET` in the server deployment environment. Never expose either using a `NEXT_PUBLIC_*` variable.
+3. Configure a scheduler to call `https://YOUR_DEPLOYMENT/api/worker` every five minutes with `Authorization: Bearer YOUR_CRON_SECRET`. If using Vercel Cron, configure it in the deployment settings only if the current plan supports that frequency; some plans restrict cron frequency. Otherwise use another trusted scheduler.
+4. Ensure the deployment platform permits the worker function to run for up to 60 seconds. If scheduled invocations are delayed or disabled, jobs remain persisted and resume when the scheduler runs again.
 
-Instead of functioning as a chatbot, the application processes each document independently, generates structured summaries and analyses, stores the results in PostgreSQL, and presents them through a modern web interface.
+The scheduler claims one job per invocation. Overlapping invocations are safe because PostgreSQL claims work atomically with `FOR UPDATE SKIP LOCKED`. Temporary provider/persistence failures receive bounded retries; expired leases and exhausted jobs are reconciled rather than remaining stuck forever.
 
-This project was built as a portfolio project to demonstrate practical skills in:
+## Requirements and local setup
 
-- AI Automation Engineering
-- LLM Integration
-- n8n Workflow Automation
-- Next.js Full Stack Development
-- Prompt Engineering
-- Software Architecture
-
----
-
-# ✨ Features
-
-## Current MVP
-
-- Upload PDF documents
-- PDF validation
-- Text extraction
-- Text cleaning
-- AI-powered structured summary
-- AI-generated document analysis
-- Automatic document categorization
-- Keyword extraction
-- PostgreSQL persistence
-- User authentication
-- Document history
-- Error handling
-- Responsive UI
-
----
-
-# 🏗 Architecture
-
-```text
-                 User
-                   │
-                   ▼
-          Next.js Frontend
-                   │
-                   ▼
-         Next.js API Route
-                   │
-                   ▼
-             n8n Webhook
-                   │
-                   ▼
-          PDF Validation
-                   │
-                   ▼
-          Text Extraction
-                   │
-                   ▼
-            Text Cleaning
-                   │
-                   ▼
-          Gemini / Groq API
-                   │
-                   ▼
-      Structured JSON Response
-                   │
-                   ▼
-          Supabase PostgreSQL
-                   │
-                   ▼
-          Results & History
-```
-
----
-
-# ⚙ Tech Stack
-
-## Frontend
-
-- Next.js 15
-- React
-- TypeScript
-- Tailwind CSS
-
-## Backend
-
-- n8n
-
-## AI
-
-- Google Gemini
-- Groq
-
-## Database
-
-- PostgreSQL
-- Supabase
-
-## Authentication
-
-- Supabase Auth
-
-## Deployment
-
-- Vercel
-- n8n Cloud
-
----
-
-# 📁 Project Structure
-
-```text
-ai-pdf-processor-pipeline/
-
-├── frontend/
-│
-├── n8n/
-│   ├── workflow.json
-│   └── README.md
-│
-├── database/
-│   ├── schema.sql
-│   └── migrations/
-│
-├── prompts/
-│   ├── system-prompt.md
-│   └── user-prompt.md
-│
-├── docs/
-│   ├── architecture.md
-│   ├── database-schema.png
-│   └── workflow.png
-│
-├── .env.example
-│
-└── README.md
-```
-
----
-
-# 🔄 Workflow
-
-```text
-Upload PDF
-      │
-      ▼
-Validate PDF
-      │
-      ▼
-Extract Text
-      │
-      ▼
-Clean Text
-      │
-      ▼
-Generate AI Analysis
-      │
-      ▼
-Validate AI Output
-      │
-      ▼
-Store Results
-      │
-      ▼
-Return Response
-```
-
----
-
-# 🗄 Database
-
-Main tables:
-
-- profiles
-- documents
-- ai_results
-- processing_logs
-- notifications
-
-Relationships:
-
-```text
-profiles
-    │
-    ├──────────────┐
-    ▼              ▼
-documents     notifications
-    │
-    ▼
-ai_results
-    │
-    ▼
-processing_logs
-```
-
----
-
-# 🤖 AI Processing
-
-The LLM receives the extracted document text and produces:
-
-- Structured summary
-- Key points
-- Keywords
-- Category
-- Document analysis
-- Strengths
-- Limitations
-- Actionable recommendations
-
-The output is returned as structured JSON before being stored in PostgreSQL.
-
----
-
-# 📄 Supported Documents
-
-Current MVP:
-
-- Text-based PDF
-- Maximum size: 20 MB
-- One document per request
-
-Not supported:
-
-- OCR
-- Image-only PDFs
-- Password-protected PDFs
-- Parallel processing
-
----
-
-# 🛡 Error Handling
-
-The pipeline handles:
-
-- Invalid PDF
-- Empty document
-- Corrupted PDF
-- Unsupported format
-- AI timeout
-- API quota exceeded
-- Database errors
-- Notification failures
-
-Each execution generates processing logs for easier debugging.
-
----
-
-# 📊 Future Roadmap
-
-## Version 2
-
-- OCR support
-- Multiple document upload
-- Better UI
-- Dashboard
-- Advanced filtering
-
-## Version 3
-
-- RAG
-- Vector database
-- Semantic search
-- Multiple AI providers
-- Team workspaces
-
----
-
-# 🚀 Local Installation
-
-## Clone repository
+- Node.js 20+
+- npm
+- Supabase project with email/password auth enabled
+- Gemini API key
 
 ```bash
-git clone https://github.com/your-username/ai-pdf-processor-pipeline.git
-```
-
-## Install dependencies
-
-```bash
-cd frontend
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
----
+Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, and `CRON_SECRET` in the relevant server environment. The service-role key and cron secret must remain server-side.
 
-# 🔐 Environment Variables
+## Checks
 
-Create a `.env.local` file:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=
-
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-
-SUPABASE_SERVICE_ROLE_KEY=
-
-N8N_WEBHOOK_URL=
-
-GEMINI_API_KEY=
-
-GROQ_API_KEY=
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
 ```
 
----
+No live Supabase/Gemini integration test is claimed. CI success does not validate external credentials, queue scheduling, real PDFs or evidence quality. Commit a reviewed lockfile before treating dependency resolution as reproducible.
 
-# 📦 Deployment
+## Scope and safety
 
-## Frontend
-
-- Vercel
-
-## Workflow
-
-- n8n Cloud
-
-## Database
-
-- Supabase
-
----
-
-# 🎯 Learning Objectives
-
-This project demonstrates practical experience with:
-
-- AI Automation Engineering
-- Production AI Pipelines
-- Prompt Engineering
-- Workflow Automation
-- LLM Integration
-- Next.js Full Stack Development
-- PostgreSQL Database Design
-- Supabase
-- REST APIs
-- Software Architecture
-- Error Handling
-- Deployment
-
----
-
-# 📸 Screenshots
-
-The repository will include:
-
-```text
-/docs/screenshots/
-
-Home Page
-
-Upload Page
-
-Processing
-
-Results
-
-Database
-
-Workflow
-```
-
----
-
-# 📜 License
-
-This project is released under the MIT License.
-
----
-
-# 👨‍💻 Author
-
-**Abdel Hakim Koumad**
-
-Computer Science Engineering Student
-
-**AI Builder → AI Automation Engineer → AI Agent Developer → AI SaaS Builder**
-
-Focused on building production-ready AI applications using LLMs, workflow automation, and modern full-stack technologies.
+This is still an early MVP, not production-ready. Immutable reprocessing/version history, OCR, n8n callbacks, full end-to-end and adversarial authorization tests, monitoring/alerting, and robust cross-system deletion recovery remain incomplete. Page-level evidence depends on PDF extraction boundaries and must be tested against a representative fixture corpus. Do not upload confidential, regulated, or high-impact documents. Extracted text is sent to Google Gemini.
