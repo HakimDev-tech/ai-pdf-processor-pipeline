@@ -27,6 +27,30 @@ export async function POST(request: Request) {
     if (authError || !user) return jsonError(401, "Sign in before uploading a document.");
     ownerId = user.id;
 
+    const idempotencyKey = request.headers.get("idempotency-key")?.trim().slice(0, 200) || crypto.randomUUID();
+    const { data: previousRun, error: previousRunError } = await supabase
+      .from("processing_runs")
+      .select("id, document_id, state")
+      .eq("owner_id", ownerId)
+      .eq("idempotency_key", idempotencyKey)
+      .maybeSingle();
+    if (previousRunError) return jsonError(502, "The request could not be checked for a previous attempt.");
+    if (previousRun) {
+      if (previousRun.state === "completed") {
+        const { data: previousResult, error: previousResultError } = await supabase
+          .from("analysis_results")
+          .select("result")
+          .eq("run_id", previousRun.id)
+          .eq("owner_id", ownerId)
+          .maybeSingle();
+        if (previousResultError || !previousResult) return jsonError(502, "A completed request exists, but its saved result could not be loaded.");
+        return NextResponse.json({ analysis: previousResult.result, metadata: { documentId: previousRun.document_id, runId: previousRun.id, replayed: true } });
+      }
+      return jsonError(409, previousRun.state === "failed"
+        ? "This request key belongs to a failed attempt. Select the PDF again to start a fresh attempt."
+        : "This request is already being processed. Wait for it to finish before retrying.");
+    }
+
     const form = await request.formData();
     const value = form.get("file");
     if (!(value instanceof File)) return jsonError(400, "Choose a PDF file.");
@@ -63,7 +87,6 @@ export async function POST(request: Request) {
       await supabase.storage.from("private-pdfs").remove([storageKey]);
       return jsonError(502, "The document record could not be saved. Apply the database migration and retry.");
     }
-    const idempotencyKey = request.headers.get("idempotency-key")?.slice(0, 200) || crypto.randomUUID();
     const { data: run, error: runError } = await supabase.from("processing_runs").insert({
       document_id: documentId, owner_id: ownerId, run_number: 1, state: "analyzing",
       idempotency_key: idempotencyKey, provider: "google", model: env.GEMINI_MODEL, started_at: new Date().toISOString()
