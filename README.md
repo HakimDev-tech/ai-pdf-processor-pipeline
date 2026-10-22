@@ -2,49 +2,41 @@
 
 A document-intelligence MVP focused on structured analysis and inspectable evidence rather than a generic PDF chatbot.
 
-## Implemented in this branch
+## Current capabilities
 
 - Next.js App Router, TypeScript strict mode and a responsive document-workbench UI.
-- Supabase email/password sign-in/sign-up.
-- Authenticated PDF intake, input bounds checks and text extraction.
-- Private Supabase Storage and owner-scoped document, run, result and event records.
-- Gemini structured analysis with Zod validation and evidence excerpt checks.
-- JSON export and a persistent document-history panel with latest saved results.
-- Owner-scoped document deletion covering the private PDF object and cascading database records.
-- SQL migrations for tables, RLS and private storage policies.
-- Vitest schema tests and GitHub Actions checks for lint, typecheck, tests and build.
+- Supabase email/password authentication and owner-scoped document history.
+- Bounded PDF upload checks and private Supabase Storage.
+- Durable database-backed processing queue with atomic worker claims, expiring leases, bounded retries, backoff and exhausted-job reconciliation.
+- Gemini structured analysis with Zod validation and page-level evidence excerpt checks.
+- Persisted results, processing events, idempotent request replay, JSON export and owner-scoped document deletion.
+- GitHub Actions checks for lint, typecheck, tests and production build.
 
-## Scope limits
+## Worker scheduling is required
 
-This is an early MVP, not production-ready. Processing runs in a single server request. Durable workers/queues, safe retries and reconciliation, immutable reprocessing history, OCR, n8n callbacks, full end-to-end and adversarial authorization tests, and robust cross-system deletion recovery remain incomplete. Page-level evidence mapping depends on the quality and page boundaries of PDF text extraction; validate it against a fixture corpus before relying on findings.
+The upload API stores a job and returns without running the AI analysis inline. A scheduler must invoke `GET /api/worker` to drain the queue. The worker checks the `CRON_SECRET` bearer token.
 
-Do not upload confidential, regulated, or high-impact documents. Extracted text is sent to Google Gemini for analysis.
+1. Apply every SQL migration in `supabase/migrations`, including `202610220003_durable_processing_queue.sql`.
+2. Set `SUPABASE_SERVICE_ROLE_KEY` and a strong random `CRON_SECRET` in the server deployment environment. Never expose either using a `NEXT_PUBLIC_*` variable.
+3. The included `vercel.json` configures a five-minute Vercel Cron. Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically when that environment variable is configured. Confirm that the deployment plan supports the selected cron frequency; otherwise configure an external scheduler to call `/api/worker` with that header.
+4. Ensure the deployment platform permits the worker function to run for up to 60 seconds. If scheduled invocations are delayed or disabled, jobs remain persisted and resume when the scheduler runs again.
 
-## Requirements
+The scheduler claims one job per invocation. Overlapping invocations are safe because PostgreSQL claims work atomically with `FOR UPDATE SKIP LOCKED`. Temporary provider/persistence failures receive bounded retries; expired leases and exhausted jobs are reconciled rather than remaining stuck forever.
+
+## Requirements and local setup
 
 - Node.js 20+
 - npm
-- A Supabase project
-- A Gemini API key
-
-## Local setup
+- Supabase project with email/password auth enabled
+- Gemini API key
 
 ```bash
 npm install
 cp .env.example .env.local
-```
-
-Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `GEMINI_API_KEY` in `.env.local`. Optional variables: `GEMINI_MODEL`, `MAX_PDF_BYTES`, `MAX_EXTRACTED_CHARS`.
-
-Never commit `.env.local` or expose the Gemini key or Supabase service-role key in a `NEXT_PUBLIC_*` variable. This implementation does not require a service-role key.
-
-Apply every SQL migration in `supabase/migrations` to your Supabase project and enable email/password authentication in Supabase Auth. Then run:
-
-```bash
 npm run dev
 ```
 
-Open http://localhost:3000 and sign in at `/login`.
+Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`, and `CRON_SECRET` in the relevant server environment. The service-role key and cron secret must remain server-side.
 
 ## Checks
 
@@ -55,8 +47,8 @@ npm test
 npm run build
 ```
 
-GitHub Actions runs these checks. No lockfile is committed yet, so CI currently uses `npm install`; commit a reviewed package lockfile before treating dependency resolution as reproducible.
+No live Supabase/Gemini integration test is claimed. CI success does not validate external credentials, queue scheduling, real PDFs or evidence quality. Commit a reviewed lockfile before treating dependency resolution as reproducible.
 
-## Privacy and reliability
+## Scope and safety
 
-PDFs are stored in a private Supabase Storage bucket. Extracted text is sent to Google Gemini. RLS is an initial owner-scoping layer and has not had a full adversarial audit. OCR, durable queueing, compliance certification, and guaranteed evidence accuracy are not claimed.
+This is still an early MVP, not production-ready. Immutable reprocessing/version history, OCR, n8n callbacks, full end-to-end and adversarial authorization tests, monitoring/alerting, and robust cross-system deletion recovery remain incomplete. Page-level evidence depends on PDF extraction boundaries and must be tested against a representative fixture corpus. Do not upload confidential, regulated, or high-impact documents. Extracted text is sent to Google Gemini.

@@ -59,8 +59,34 @@ export default function Home() {
     try {
       const data = new FormData(); data.set("file", file);
       const response = await fetch("/api/analyze", { method: "POST", headers: { "idempotency-key": requestKey || crypto.randomUUID() }, body: data });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Analysis failed.");
+      let payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Analysis could not be queued.");
+      if (response.status === 202 && payload.documentId) {
+        setMessage("PDF saved to the durable queue. Waiting for a worker…");
+        let completed = false;
+        for (let attempt = 0; attempt < 150; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          const statusResponse = await fetch("/api/documents/" + payload.documentId + "/status", { cache: "no-store" });
+          const statusPayload = await statusResponse.json();
+          if (!statusResponse.ok) throw new Error(statusPayload.error ?? "Could not retrieve processing status.");
+          if (statusPayload.state === "completed" && statusPayload.analysis) {
+            payload = statusPayload;
+            completed = true;
+            break;
+          }
+          if (statusPayload.state === "failed" || statusPayload.state === "needs_attention") {
+            throw new Error("Processing failed after " + (statusPayload.attempt ?? 0) + " attempt(s). Code: " + (statusPayload.error ?? "PROCESSING_FAILED") + ". The saved document remains in history.");
+          }
+          if (attempt % 10 === 9) setMessage("Document remains safely queued or is being processed. Attempt " + (statusPayload.attempt ?? 0) + " of " + (statusPayload.maxAttempts ?? 3) + "…");
+        }
+        if (!completed) {
+          setMessage("The document is saved and processing continues in the background. Refresh history to check its status.");
+          setError(false);
+          await refreshHistory();
+          return;
+        }
+      }
+      if (!payload.analysis) throw new Error("The worker completed without returning a saved analysis result.");
       setAnalysis(payload.analysis as Analysis);
       setMessage("Analysis completed. Review evidence and uncertainty before relying on any finding.");
       setError(false);
@@ -102,6 +128,6 @@ export default function Home() {
       {([[ "Key points", analysis.keyPoints ],["Dates and obligations",analysis.datesAndObligations],["Risks and ambiguities",analysis.risksAndAmbiguities]] as const).map(([heading,items])=><div key={heading}><h3>{heading}</h3>{items.length===0?<p className="muted">No items returned.</p>:items.map((item,i)=><article key={heading+i} className="notice" style={{marginBottom:10}}><b>{item.text}</b><p className="muted">Certainty: {item.certainty}</p>{item.evidence.map((ev,j)=><blockquote key={j} style={{borderLeft:"2px solid #315c50",paddingLeft:12,margin:"10px 0",fontSize:13}}>Page {ev.page}: “{ev.excerpt}”</blockquote>)}</article>)}</div>)}
       <h3>Recommendations</h3><ul>{analysis.recommendations.map((x,i)=><li key={i}>{x}</li>)}</ul><h3>Limitations</h3><ul>{analysis.limitations.map((x,i)=><li key={i}>{x}</li>)}</ul><button className="button" onClick={()=>{const blob=new Blob([JSON.stringify(analysis,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="papertrail-analysis.json";a.click();URL.revokeObjectURL(url);}}>Export validated JSON</button>
     </section>}
-    <footer className="foot"><span>Papertrail · Early technical MVP</span><span>No OCR · Saved history requires Supabase configuration</span></footer>
+    <footer className="foot"><span>Papertrail · Early technical MVP</span><span>No OCR · Background queue requires the configured worker scheduler</span></footer>
   </main>;
 }
