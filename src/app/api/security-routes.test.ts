@@ -13,6 +13,8 @@ vi.mock("@/lib/supabase/server", () => ({
   }))
 }));
 
+vi.mock("pdf-parse", () => ({ default: vi.fn() }));
+
 vi.mock("@supabase/supabase-js", () => ({
   createClient: mocks.createClient
 }));
