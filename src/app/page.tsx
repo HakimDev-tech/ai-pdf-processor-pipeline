@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 type Analysis = {
   title: string; category: string; language: string; summary: string;
@@ -33,7 +34,7 @@ export default function Home() {
   }
 
   return <main className="shell">
-    <header className="topbar"><a className="brand" href="/" aria-label="Papertrail home">papertrail<span>.</span></a><div style={{display:"flex",alignItems:"center",gap:18}}><a href="/login" style={{fontSize:13,textDecoration:"none"}}>Sign in / Create account</a><span className="mono">Document intelligence / 01</span></div></header>
+    <header className="topbar"><Link className="brand" href="/" aria-label="Papertrail home">papertrail<span>.</span></Link><div style={{display:"flex",alignItems:"center",gap:18}}><Link href="/login" style={{fontSize:13,textDecoration:"none"}}>Sign in / Create account</Link><span className="mono">Document intelligence / 01</span></div></header>
     <section className="hero"><div className="mono">READ LESS. VERIFY MORE.</div><h1>Documents deserve<br/>better than a summary.</h1><p>Turn a text-based PDF into structured findings you can inspect. Important claims are paired with page-level excerpts; uncertainty stays visible instead of being smoothed away.</p></section>
     <section className="layout-grid">
       <div className="panel"><div className="mono">01 / INPUT</div><h2>Analyze a document</h2><p className="muted">Upload one text-based PDF. Maximum 20 MB. Scanned/image-only PDFs require OCR, which is not supported in this version.</p>

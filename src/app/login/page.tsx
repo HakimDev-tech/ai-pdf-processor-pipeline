@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -28,7 +29,7 @@ export default function LoginPage() {
     } finally { setBusy(false); }
   }
 
-  return <main className="shell"><header className="topbar"><a className="brand" href="/">papertrail<span>.</span></a><span className="mono">ACCOUNT ACCESS</span></header>
+  return <main className="shell"><header className="topbar"><Link className="brand" href="/">papertrail<span>.</span></Link><span className="mono">ACCOUNT ACCESS</span></header>
     <section className="hero"><div className="mono">PRIVATE WORKSPACE</div><h1>{mode === "sign-in" ? "Sign in." : "Create an account."}</h1><p>Authentication is handled by your configured Supabase project. Documents are stored privately and access is scoped to your account.</p></section>
     <section className="panel" style={{maxWidth:480,marginBottom:80}}><form onSubmit={submit} style={{display:"grid",gap:16}}>
       <label>Email<input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} style={{display:"block",width:"100%",padding:12,marginTop:6,border:"1px solid var(--line)",background:"white"}}/></label>
