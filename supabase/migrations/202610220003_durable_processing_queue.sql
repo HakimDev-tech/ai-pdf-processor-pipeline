@@ -100,3 +100,20 @@ $$;
 
 revoke all on function public.fail_exhausted_processing_runs() from public, anon, authenticated;
 grant execute on function public.fail_exhausted_processing_runs() to service_role;
+
+
+-- Prevent a retry or accidental application write from mutating an already saved result.
+create or replace function public.prevent_analysis_result_update()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  raise exception 'analysis_results rows are immutable';
+end;
+$$;
+
+drop trigger if exists analysis_results_immutable_update on public.analysis_results;
+create trigger analysis_results_immutable_update
+before update on public.analysis_results
+for each row execute function public.prevent_analysis_result_update();

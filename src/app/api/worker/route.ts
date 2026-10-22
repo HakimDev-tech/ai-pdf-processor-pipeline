@@ -90,11 +90,21 @@ export async function POST(request: Request) {
     await supabase.from("processing_runs").update({ state: "validating" })
       .eq("id", job.run_id).eq("worker_id", workerId);
 
-    const { error: resultError } = await supabase.from("analysis_results").upsert({
+    const { error: resultError } = await supabase.from("analysis_results").insert({
       run_id: job.run_id, document_id: job.document_id, owner_id: job.owner_id,
       schema_version: "1", prompt_version: "1", result: validated
-    }, { onConflict: "run_id" });
-    if (resultError) throw new Error("RESULT_PERSISTENCE_FAILED");
+    });
+    if (resultError) {
+      // A previous attempt may have committed the result before losing its lease.
+      // Keep that immutable result; never overwrite it with a retry's new output.
+      if (resultError.code === "23505") {
+        const { data: existingResult, error: existingResultError } = await supabase.from("analysis_results")
+          .select("id").eq("run_id", job.run_id).eq("owner_id", job.owner_id).maybeSingle();
+        if (existingResultError || !existingResult) throw new Error("RESULT_PERSISTENCE_FAILED");
+      } else {
+        throw new Error("RESULT_PERSISTENCE_FAILED");
+      }
+    }
 
     const finishedAt = new Date().toISOString();
     const { error: completionError } = await supabase.from("processing_runs").update({
