@@ -67,7 +67,8 @@ export async function POST(request: Request) {
     let parsed: { text: string; numpages: number };
     try { parsed = await pdf(bytes); }
     catch { return jsonError(422, "The PDF could not be parsed. It may be malformed, encrypted, or password-protected."); }
-    const text = parsed.text.replace(/\u0000/g, "").trim();
+    const extractedText = parsed.text.replace(/\u0000/g, "");
+    const text = extractedText.trim();
     if (!text) return jsonError(422, "No selectable text was found. Scanned or image-only PDFs are not supported yet.");
     if (parsed.numpages > 250) return jsonError(413, "This PDF has too many pages for the current processing limit.");
     if (text.length > env.MAX_EXTRACTED_CHARS) return jsonError(413, "Extracted text exceeds the current analysis limit. Use a shorter PDF.");
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
     }
     runId = run.id;
 
-    const pageTexts = text.split("\f").map((page) => page.trim());
+    const pageTexts = extractedText.split("\f").map((page) => page.trim());
     const safePages = pageTexts.length ? pageTexts : [text];
     const analysis = await analyzeDocument(safePages);
     const validatedAnalysis = validateAnalysisEvidence(analysis, safePages);
