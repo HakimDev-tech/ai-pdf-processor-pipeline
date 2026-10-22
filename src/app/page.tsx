@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import SignalField from "@/components/SignalField";
 
 type Analysis = {
   title: string; category: string; language: string; summary: string;
@@ -19,6 +20,7 @@ type SavedDocument = {
 };
 
 export default function Home() {
+  const [menuOpen, setMenuOpen] = useState(false);
   const [documents, setDocuments] = useState<SavedDocument[]>([]);
   const [historyBusy, setHistoryBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -129,16 +131,40 @@ export default function Home() {
   }
 
   return <main className="shell">
-    <header className="topbar"><Link className="brand" href="/" aria-label="Papertrail home">papertrail<span>.</span></Link><div style={{display:"flex",alignItems:"center",gap:18}}><Link href="/login" style={{fontSize:13,textDecoration:"none"}}>Sign in / Create account</Link><span className="mono">Document intelligence / 01</span></div></header>
-    <section className="hero"><div className="mono">READ LESS. VERIFY MORE.</div><h1>Documents deserve<br/>better than a summary.</h1><p>Turn a text-based PDF into structured findings you can inspect. Important claims are paired with page-level excerpts; uncertainty stays visible instead of being smoothed away.</p></section>
-    <section className="layout-grid">
-      <div className="panel"><div className="mono">01 / INPUT</div><h2>Analyze a document</h2><p className="muted">Upload one text-based PDF. Maximum 20 MB. Scanned/image-only PDFs require OCR, which is not supported in this version.</p>
-        <div className="upload"><label htmlFor="pdf" className="mono">SELECT PDF FILE</label><input id="pdf" className="file-input" type="file" accept="application/pdf,.pdf" onChange={e=>{setFile(e.target.files?.[0] ?? null);setRequestKey(crypto.randomUUID());setAnalysis(null);setMessage("");}}/><button className="button" onClick={submit} disabled={busy}>{busy ? "Analyzing document…" : "Analyze PDF"}</button><p className="muted">The file is sent to this server for text extraction and to Google Gemini for analysis. Do not upload sensitive or confidential documents.</p></div>
+    <header className="topbar">
+      <Link className="brand" href="/" aria-label="Papertrail home"><span className="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span><span className="brand-word">papertrail<span className="brand-period">.</span></span></Link>
+      <nav className={`site-nav ${menuOpen ? "is-open" : ""}`} aria-label="Main navigation">
+        <a href="#workspace" onClick={() => setMenuOpen(false)}>Workspace <span>01</span></a>
+        <a href="#method" onClick={() => setMenuOpen(false)}>Method <span>02</span></a>
+        <a href="#library" onClick={() => setMenuOpen(false)}>Library <span>03</span></a>
+        <Link className="nav-account" href="/login" onClick={() => setMenuOpen(false)}>Sign in <span aria-hidden="true">↗</span></Link>
+      </nav>
+      <button className={`menu-toggle ${menuOpen ? "is-open" : ""}`} type="button" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}><span></span><span></span></button>
+    </header>
+    <section className="hero" id="top">
+      <div className="hero-copy">
+        <div className="eyebrow"><span className="status-pulse"></span> DOCUMENT INTELLIGENCE <span className="eyebrow-index">FIELD NOTES / 001</span></div>
+        <h1>Read between<br/>the <em>lines.</em></h1>
+        <p>Documents are full of details that summaries flatten. Papertrail turns dense PDFs into structured findings — with the source, page, and uncertainty still attached.</p>
+        <div className="hero-actions"><a className="hero-cta" href="#workspace">Inspect a document <span aria-hidden="true">↘</span></a><span className="hero-meta">PDF → EVIDENCE → DECISION</span></div>
+      </div>
+      <div className="hero-stage" aria-label="Animated illustration of a document being decomposed into evidence">
+        <SignalField />
+        <div className="stage-corner stage-corner-tl">FIG. 01 <span>·</span> TRACEABLE INPUT</div>
+        <div className="stage-corner stage-corner-br">PAGE / SIGNAL / SOURCE <span className="stage-live"><i></i> LIVE FIELD</span></div>
+        <div className="stage-chip stage-chip-a"><span className="chip-dot"></span> Evidence linked <b>↗</b></div>
+        <div className="stage-chip stage-chip-b"><span className="chip-bars"><i></i><i></i><i></i></span> Ambiguity preserved</div>
+      </div>
+      <div className="hero-index" aria-hidden="true"><span>01</span><span className="index-line"></span><span>03</span></div>
+    </section>
+    <section className="layout-grid" id="workspace">
+      <div className="panel upload-panel"><div className="panel-heading"><span className="section-index">01</span><div><div className="mono">INPUT / INGESTION</div><h2>Start with a source.</h2></div><span className="panel-glyph" aria-hidden="true">↗</span></div><p className="muted">Upload one text-based PDF. Maximum 20 MB. Scanned/image-only PDFs require OCR, which is not supported in this version.</p>
+        <div className="upload"><div className="upload-orbit" aria-hidden="true"><span>PDF</span><i></i><i></i><i></i></div><label htmlFor="pdf" className="mono">SELECT PDF FILE</label><input id="pdf" className="file-input" type="file" accept="application/pdf,.pdf" onChange={e=>{setFile(e.target.files?.[0] ?? null);setRequestKey(crypto.randomUUID());setAnalysis(null);setMessage("");}}/><button className="button" onClick={submit} disabled={busy}>{busy ? "Analyzing document…" : "Analyze PDF"}</button><p className="muted">The file is sent to this server for text extraction and to Google Gemini for analysis. Do not upload sensitive or confidential documents.</p></div>
         {message && <p className={`notice ${error ? "error" : "success"}`} role="status">{message}</p>}
       </div>
-      <aside className="panel"><div className="mono">02 / METHOD</div><h2>Evidence before confidence</h2><p className="muted">A small, deliberate workflow designed to make source limitations legible.</p><ol className="steps"><li><span className="num">01</span><span><b>Validate</b><br/>Check file type, size and PDF readability.</span></li><li><span className="num">02</span><span><b>Extract</b><br/>Keep page boundaries so findings can point back to source text.</span></li><li><span className="num">03</span><span><b>Structure</b><br/>Validate the model response before showing it.</span></li><li><span className="num">04</span><span><b>Inspect</b><br/>Compare each finding with its cited page excerpt.</span></li></ol></aside>
+      <aside className="panel method-panel" id="method"><div className="panel-heading"><span className="section-index">02</span><div><div className="mono">METHOD / PIPELINE</div><h2>Evidence before confidence.</h2></div></div><p className="muted">A small, deliberate workflow designed to make source limitations legible.</p><ol className="steps"><li><span className="num">01</span><span><b>Validate</b><br/>Check file type, size and PDF readability.</span></li><li><span className="num">02</span><span><b>Extract</b><br/>Keep page boundaries so findings can point back to source text.</span></li><li><span className="num">03</span><span><b>Structure</b><br/>Validate the model response before showing it.</span></li><li><span className="num">04</span><span><b>Inspect</b><br/>Compare each finding with its cited page excerpt.</span></li></ol></aside>
     </section>
-    <section className="panel" style={{marginBottom:24}}>
+    <section className="panel library-panel" id="library" style={{marginBottom:24}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,flexWrap:"wrap"}}>
         <div><div className="mono">03 / LIBRARY</div><h2>Document history</h2><p className="muted">Saved PDFs and the latest persisted analysis for this account.</p></div>
         <button className="button" onClick={() => void refreshHistory()} disabled={historyBusy}>{historyBusy ? "Refreshing…" : "Refresh history"}</button>
@@ -167,10 +193,10 @@ export default function Home() {
           </article>)}
         </div>}
     </section>
-    {analysis && <section className="panel" style={{marginBottom:48}}><div className="mono">ANALYSIS RESULT</div><h2>{analysis.title || "Untitled document"}</h2><p className="muted">{analysis.category} · {analysis.language}</p><h3>Executive summary</h3><p style={{lineHeight:1.7}}>{analysis.summary}</p>
+    {analysis && <section className="panel analysis-panel" id="analysis" style={{marginBottom:48}}><div className="mono">ANALYSIS RESULT</div><h2>{analysis.title || "Untitled document"}</h2><p className="muted">{analysis.category} · {analysis.language}</p><h3>Executive summary</h3><p style={{lineHeight:1.7}}>{analysis.summary}</p>
       {([[ "Key points", analysis.keyPoints ],["Dates and obligations",analysis.datesAndObligations],["Risks and ambiguities",analysis.risksAndAmbiguities]] as const).map(([heading,items])=><div key={heading}><h3>{heading}</h3>{items.length===0?<p className="muted">No items returned.</p>:items.map((item,i)=><article key={heading+i} className="notice" style={{marginBottom:10}}><b>{item.text}</b><p className="muted">Certainty: {item.certainty}</p>{item.evidence.map((ev,j)=><blockquote key={j} style={{borderLeft:"2px solid #315c50",paddingLeft:12,margin:"10px 0",fontSize:13}}>Page {ev.page}: “{ev.excerpt}”</blockquote>)}</article>)}</div>)}
       <h3>Recommendations</h3><ul>{analysis.recommendations.map((x,i)=><li key={i}>{x}</li>)}</ul><h3>Limitations</h3><ul>{analysis.limitations.map((x,i)=><li key={i}>{x}</li>)}</ul><button className="button" onClick={()=>{const blob=new Blob([JSON.stringify(analysis,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="papertrail-analysis.json";a.click();URL.revokeObjectURL(url);}}>Export validated JSON</button>
     </section>}
-    <footer className="foot"><span>Papertrail · Early technical MVP</span><span>No OCR · Background queue requires the configured worker scheduler</span></footer>
+    <footer className="foot"><div className="foot-brand"><span className="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span> papertrail<span className="brand-period">.</span></div><span>Made for careful reading, not confident guessing.</span><a href="#top">Back to top ↑</a><span className="foot-note">NO OCR · WORKER SCHEDULER REQUIRED</span></footer>
   </main>;
 }
